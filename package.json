@@ -1,0 +1,22 @@
+{
+  "name": "tendermint-sg",
+  "version": "1.0.0",
+  "description": "A proof-of-stake fork of SpartanGold patterned after Tendermint",
+  "main": "driver.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/taustin/tendermint-sg.git"
+  },
+  "author": "Tom Austin",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/taustin/tendermint-sg/issues"
+  },
+  "homepage": "https://github.com/taustin/tendermint-sg#readme",
+  "dependencies": {
+    "jsbn": "^1.1.0"
+  }
+}
