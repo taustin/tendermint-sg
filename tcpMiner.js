@@ -3,9 +3,11 @@ const readline = require('readline');
 
 const FakeNet = require('./fakeNet.js');
 const Blockchain = require('./blockchain.js');
-const Block = require('./block.js');
-const Miner = require('./miner.js');
 const Transaction = require('./transaction.js');
+
+// Variants used for staking
+const Validator = require('./validator.js');
+const StakeBlock = require('./stake-block.js');
 
 /**
  * This extends the FakeNet class to actually communicate over the network.
@@ -26,7 +28,7 @@ class TcpNet extends FakeNet {
  * Provides a command line interface for a SpartanGold miner
  * that will actually communicate over the network.
  */
-class TcpMiner extends Miner {
+class TcpMiner extends Validator {
   static get REGISTER() { return "REGISTER"; }
 
   /**
@@ -112,7 +114,7 @@ let name = `Miner${port}`;
 let knownMiners = process.argv.slice(3);
 
 let emptyGenesis = Blockchain.makeGenesis({
-  blockClass: Block,
+  blockClass: StakeBlock,
   transactionClass: Transaction
 });
 
@@ -133,12 +135,15 @@ let rl = readline.createInterface({
 function readUserInput() {
   rl.question(`
   Funds: ${minnie.availableGold}
+  Staked gold: ${minnie.amountGoldStaked()}
   Address: ${minnie.address}
   Pending transactions: ${minnie.showPendingOut()}
   
   What would you like to do?
   *(c)onnect to miner?
   *(t)ransfer funds?
+  *(s)take gold?
+  *(u)nstake gold?
   *(r)esend pending transactions?
   *show (b)alances?
   *show blocks for (d)ebugging and exit?
@@ -167,6 +172,7 @@ function readUserInput() {
           amt = parseInt(amt);
           if (amt > minnie.availableGold) {
             console.log(`***Insufficient gold.  You only have ${minnie.availableGold}.`);
+            readUserInput();
           } else {
             rl.question(`  address: `, (addr) => {
               let output = {amount: amt, address: addr};
@@ -174,6 +180,30 @@ function readUserInput() {
               minnie.postTransaction([output]);
               readUserInput();
             });
+          }
+        });
+        break;
+      case 's':
+        rl.question(`  amount to stake: `, (amt) => {
+          amt = parseInt(amt);
+          if (amt > minnie.availableGold) {
+            console.log(`***Insufficient gold.  You only have ${minnie.availableGold}.`);
+          } else {
+            console.log(`Staking ${amt} gold.`);
+            minnie.postStakingTransaction(amt);
+            readUserInput();
+          }
+        });
+        break;
+      case 'u':
+        rl.question(`  amount to unstake: `, (amt) => {
+          amt = parseInt(amt);
+          if (amt > minnie.availableGold) {
+            console.log(`***Insufficient gold.  You only have ${minnie.availableGold}.`);
+          } else {
+            console.log(`Staking ${amt} gold.`);
+            minnie.postUnstakingTransaction(amt);
+            readUserInput();
           }
         });
         break;
@@ -198,5 +228,6 @@ function readUserInput() {
   });
 }
 
+console.clear();
 readUserInput();
 
