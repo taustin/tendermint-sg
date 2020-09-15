@@ -1,12 +1,9 @@
 "use strict";
 
-let Blockchain = require('./blockchain.js');
-let Block = require('./block.js');
-let Client = require('./client.js');
-let Miner = require('./miner.js');
-let Transaction = require('./transaction.js');
+const { Blockchain, Block, Client, Transaction, FakeNet } = require('spartan-gold');
 
-let FakeNet = require('./fakeNet.js');
+// Tendermint extensions
+const Validator = require('./validator.js');
 
 console.log("Starting simulation.  This may take a moment...");
 
@@ -19,8 +16,8 @@ let bob = new Client({name: "Bob", net: fakeNet});
 let charlie = new Client({name: "Charlie", net: fakeNet});
 
 // Miners
-let minnie = new Miner({name: "Minnie", net: fakeNet});
-let mickey = new Miner({name: "Mickey", net: fakeNet});
+let minnie = new Validator({name: "Minnie", net: fakeNet});
+let mickey = new Validator({name: "Mickey", net: fakeNet});
 
 // Creating genesis block
 let genesis = Blockchain.makeGenesis({
@@ -37,7 +34,7 @@ let genesis = Blockchain.makeGenesis({
 
 // Late miner - Donald has more mining power, represented by the miningRounds.
 // (Mickey and Minnie have the default of 2000 rounds).
-let donald = new Miner({name: "Donald", net: fakeNet, startingBlock: genesis, miningRounds: 3000});
+let donald = new Validator({name: "Donald", net: fakeNet, startingBlock: genesis, miningRounds: 3000});
 
 function showBalances(client) {
   console.log(`Alice has ${client.lastBlock.balanceOf(alice.address)} gold.`);

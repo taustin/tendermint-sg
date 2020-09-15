@@ -1,9 +1,7 @@
 const net = require('net');
 const readline = require('readline');
 
-const FakeNet = require('./fakeNet.js');
-const Blockchain = require('./blockchain.js');
-const Transaction = require('./transaction.js');
+const { FakeNet, Blockchain, Transaction } = require('spartan-gold');
 
 // Variants used for staking
 const Validator = require('./validator.js');

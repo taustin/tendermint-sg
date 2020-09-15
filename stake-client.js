@@ -1,7 +1,7 @@
 "use strict";
 
-const Blockchain = require('./blockchain.js');
-const Client = require('./client.js');
+const { Blockchain, Client } = require('spartan-gold');
+
 const StakeBlock = require('./stake-block.js');
 
 module.exports = class StakeClient extends Client {

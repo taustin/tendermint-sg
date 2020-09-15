@@ -1,7 +1,6 @@
 "use strict";
 
-const Block = require('./block.js');
-//const LockingTransaction = require('./locking-transaction.js');
+const { Block } = require('spartan-gold');
 
 const TX_TYPE_STAKE = "STAKE";
 const TX_TYPE_UNSTAKE = "UNSTAKE";

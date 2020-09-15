@@ -1,2 +1,3 @@
 # tendermint-sg
-A fork of SpartanGold patterned after Tendermint's proof-of-stake
+
+A variant of SpartanGold patterned after Tendermint's proof-of-stake

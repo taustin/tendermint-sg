@@ -1,6 +1,7 @@
 "use strict";
 
-const Miner = require('./miner.js');
+const { Miner } = require('spartan-gold');
+
 const StakeClient = require('./stake-client.js');
 
 module.exports = class Validator extends Miner {

@@ -1,7 +1,7 @@
 {
   "name": "tendermint-sg",
   "version": "1.0.0",
-  "description": "A proof-of-stake fork of SpartanGold patterned after Tendermint",
+  "description": "A proof-of-stake variant of SpartanGold patterned after Tendermint",
   "main": "driver.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/taustin/tendermint-sg#readme",
   "dependencies": {
-    "jsbn": "^1.1.0"
+    "jsbn": "^1.1.0",
+    "spartan-gold": "^1.0.2"
   }
 }
