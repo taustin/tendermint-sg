@@ -2,11 +2,12 @@ const net = require('net');
 const readline = require('readline');
 const { readFileSync, writeFileSync } = require('fs');
 
-const { FakeNet, Blockchain, Transaction } = require('spartan-gold');
+const { FakeNet, Transaction } = require('spartan-gold');
 
 // Variants used for staking
 const Validator = require('./validator.js');
 const StakeBlock = require('./stake-block.js');
+const StakeBlockchain = require('./stake-blockchain.js');
 
 /**
  * This extends the FakeNet class to actually communicate over the network.
@@ -122,13 +123,20 @@ let name = config.name;
 
 let knownMiners = config.knownMiners || [];
 
-let emptyGenesis = Blockchain.makeGenesis({
+// Clearing the screen so things look a little nicer.
+console.clear();
+
+// Initializing starting balances.
+let startingBalances = config.genesis ? config.genesis.startingBalances : {};
+let genesis = StakeBlockchain.makeGenesis({
   blockClass: StakeBlock,
-  transactionClass: Transaction
+  transactionClass: Transaction,
+  startingBalances: startingBalances,
+  startingStake: config.genesis.startingStake
 });
 
 console.log(`Starting ${name}`);
-let minnie = new TcpMiner({name: name, keyPair: config.keyPair, connection: config.connection, startingBlock: emptyGenesis});
+let minnie = new TcpMiner({name: name, keyPair: config.keyPair, connection: config.connection, startingBlock: genesis});
 
 // Silencing the logging messages
 minnie.log = function(){};
@@ -244,6 +252,5 @@ function readUserInput() {
   });
 }
 
-console.clear();
 readUserInput();
 

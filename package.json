@@ -18,6 +18,6 @@
   "homepage": "https://github.com/taustin/tendermint-sg#readme",
   "dependencies": {
     "jsbn": "^1.1.0",
-    "spartan-gold": "^1.0.2"
+    "spartan-gold": "^1.0.3"
   }
 }
