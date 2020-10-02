@@ -1,9 +1,11 @@
 "use strict";
 
-const { Blockchain, Block, Client, Transaction, FakeNet } = require('spartan-gold');
+const { Client, Transaction, FakeNet } = require('spartan-gold');
 
 // Tendermint extensions
 const Validator = require('./validator.js');
+const StakeBlock = require('./stake-block.js');
+const Blockchain = require('./stake-blockchain.js');
 
 console.log("Starting simulation.  This may take a moment...");
 
@@ -21,7 +23,7 @@ let mickey = new Validator({name: "Mickey", net: fakeNet});
 
 // Creating genesis block
 let genesis = Blockchain.makeGenesis({
-  blockClass: Block,
+  blockClass: StakeBlock,
   transactionClass: Transaction,
   clientBalanceMap: new Map([
     [alice, 233],
@@ -29,6 +31,10 @@ let genesis = Blockchain.makeGenesis({
     [charlie, 67],
     [minnie, 400],
     [mickey, 300],
+  ]),
+  startingStakeMap: new Map([
+    [minnie, 200],
+    [mickey,  99],
   ]),
 });
 
@@ -56,7 +62,7 @@ minnie.initialize();
 mickey.initialize();
 
 // Alice transfers some money to Bob.
-console.log(`Alice is transfering 40 gold to ${bob.address}`);
+console.log(`Alice is transferring 40 gold to ${bob.address}`);
 alice.postTransaction([{ amount: 40, address: bob.address }]);
 
 setTimeout(() => {
@@ -64,7 +70,7 @@ setTimeout(() => {
   console.log("***Starting a late-to-the-party miner***");
   console.log();
   fakeNet.register(donald);
-  donald.initialize();
+  //donald.initialize();
 }, 2000);
 
 // Print out the final balances after it has been running for some time.

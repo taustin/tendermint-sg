@@ -23,6 +23,9 @@ module.exports = class StakeBlock extends Block {
     // Tracking when to unlock gold:  blockLocked -> [{ clientID, amount }]
     this.unstakingEvents = (prevBlock && prevBlock.unstakingEvents) ? new Map(prevBlock.unstakingEvents) : new Map();
 
+    // Tracking power of validators (that is, priority for proposing blocks).
+    this.accumPower = (prevBlock && prevBlock.accumPower) ? new Map(prevBlock.accumPower) : new Map();
+
     this.handleUnstakingEvents();
   }
 
@@ -43,7 +46,6 @@ module.exports = class StakeBlock extends Block {
       // No longer need to track these locking events.
       this.unstakingEvents.delete(this.chainLength);
     }
-
   }
 
   /**
@@ -59,7 +61,7 @@ module.exports = class StakeBlock extends Block {
     if (!super.addTransaction(tx, client)) return false;
 
     // For standard transactions, we don't need to do anything else.
-    if (tx.data === undefined || tx.data.type === undefined) return;
+    if (tx.data === undefined || tx.data.type === undefined) return true;
 
     switch (tx.data.type) {
       case TX_TYPE_STAKE:
@@ -129,9 +131,12 @@ module.exports = class StakeBlock extends Block {
    * @returns {Boolean} - True if the block's transactions are all valid.
    */
   rerun(prevBlock) {
-    // For coinLocking, we need to track locked funds and locking events as well.
     this.stakeBalances = new Map(prevBlock.stakeBalances);
     this.unstakingEvents = new Map(prevBlock.unstakingEvents);
+    this.accumPower = new Map(prevBlock.accumPower);
+
+    // Updating the accumulated power for the block.
+    this.updateAccumPower(this.rewardAddr);
 
     // Need to repeat any gold unstaking.
     this.handleUnstakingEvents();
@@ -139,4 +144,34 @@ module.exports = class StakeBlock extends Block {
     return super.rerun(prevBlock);
   }
 
+  hasValidProof() {
+    // FIXME: need to validate block.
+    return true;
+  }
+
+  /**
+   * This method implements Tendermint's approach for updating voting power,
+   * following the algorithm described in Section 4.3 of the 0.5 version of
+   * their paper.  (Note that the 0.6 version of their paper does not show
+   * their round-robin algorithm).
+   * 
+   * @param proposerAddr - The address of the proposer who produced the block.
+   */
+  updateAccumPower(proposerAddr) {
+    let totalBonded = 0;
+
+    // We increase the voting power of each validator by the amount of
+    // gold they have staked (or "bonded" by the terminology of their paper).
+    this.stakeBalances.forEach((amountBonded, addr) => {
+      let power = this.accumPower.get(addr) || 0;
+      this.accumPower.set(addr, power + amountBonded);
+      totalBonded += amountBonded;
+    });
+
+    // The block proposer's power is reduced by the total amount
+    // of **all** gold bonded, do that the total amount of voting
+    // power is unchanged.
+    let currentPower = this.accumPower.get(proposerAddr);
+    this.accumPower.set(proposerAddr, currentPower - totalBonded);
+  }
 };
