@@ -4,10 +4,16 @@ const { Blockchain } = require('spartan-gold');
 
 const BLOCK_PROPOSAL = "BLOCK_PROPOSAL";
 const PREVOTE = "PREVOTE";
+const PRECOMMIT = "PRECOMMIT";
+const COMMIT = "COMMIT";
+const NIL = "NIL";
 
 module.exports = class StakeBlockchain extends Blockchain {
   static get BLOCK_PROPOSAL() { return BLOCK_PROPOSAL; }
   static get PREVOTE() { return PREVOTE; }
+  static get PRECOMMIT() { return PRECOMMIT; }
+  static get COMMIT() { return COMMIT; }
+  static get NIL() { return NIL; }
 
   static makeGenesis(cfg) {
     // Generating the default genesis block from the parent

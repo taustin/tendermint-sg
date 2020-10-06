@@ -174,4 +174,15 @@ module.exports = class StakeBlock extends Block {
     let currentPower = this.accumPower.get(proposerAddr);
     this.accumPower.set(proposerAddr, currentPower - totalBonded);
   }
+
+  /**
+   * Returns total amount of bonded coins currently in the block.
+   */
+  getTotalStake() {
+    let totalStake = 0;
+    this.stakeBalances.forEach((amountBonded) => {
+      totalStake += amountBonded;
+    });
+    return totalStake;
+  }
 };
