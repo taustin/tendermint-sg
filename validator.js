@@ -31,11 +31,11 @@ module.exports = class Validator extends Miner {
 
     this.on(StakeBlockchain.POST_TRANSACTION, this.addTransaction);
 
-    // Tendermint listeners.
-    this.on(StakeBlockchain.NEW_ROUND, this.newRound);
+    // Listeners to collect proposals and votes.
     this.on(StakeBlockchain.BLOCK_PROPOSAL, this.collectProposal);
     this.on(StakeBlockchain.PREVOTE, this.collectPrevote);
     this.on(StakeBlockchain.PRECOMMIT, this.collectPrecommit);
+    this.on(StakeBlockchain.COMMIT, this.collectCommit);
 
     // Collection buckets for proposals and blocks.
     this.proposals = [];
@@ -44,9 +44,10 @@ module.exports = class Validator extends Miner {
     // Tracking votes
     this.prevotes = {};
     this.precommits = {};
+    this.commits = {};
 
     // Start block production
-    setTimeout(() => this.emit(StakeBlockchain.NEW_ROUND, 0));
+    setTimeout(() => this.newRound(), 0);
 
   }
 
@@ -168,7 +169,7 @@ module.exports = class Validator extends Miner {
   determineProposer() {
     let proposerPower = 0;
     this.roundAccumPower.forEach((power, addr) => {
-      this.log(`   ${addr} has ${power} (${typeof power}) voting power.`);
+      //this.log(`   ${addr} has ${power} (${typeof power}) voting power.`);
       if (power > proposerPower) {
         this.currentProposer = addr;
         proposerPower = power;
@@ -217,14 +218,16 @@ module.exports = class Validator extends Miner {
    */
   collectProposal(proposal) {
     this.proposals.push(new Proposal(proposal));
-    let block = this.proposals.block;
-    this.proposedBlocks[proposal.blockID] = block;
+    this.proposedBlocks[proposal.blockID] = proposal.block;
   }
 
   /**
    * Prevote for a proposal, by the following rules:
+   * 
    * 1) If locked on to a previous block, vote for the locked block.
+   * 
    * 2) Otherwise, if a valid proposal is received, vote for the new block.
+   * 
    * 3) Otherwise vote NIL.
    * 
    * This method should also check for conflicting proposals from the block proposer.
@@ -292,87 +295,138 @@ module.exports = class Validator extends Miner {
    * 1) If a block gains 2/3 votes, lock on that block and broadcast precommit.
    *   Move on to the commit phase.
    * 
-   * 2) If NIL gains 2/3 votes, release any locks.  Start a new round.
+   * 2) If NIL gains 2/3 votes, release any locks.
    * 
-   * 3) If no 2/3 majority is reached do nothing.  Start a now round.
+   * 3) If no 2/3 majority is reached do nothing.
    */
   precommit() {
     let winningBlockID = this.countVotes(this.prevotes);
     this.prevotes = {};
 
-    if (winningBlockID === undefined) {
-      this.log(`Failed to reach 2/3 majority needed for precommit at height ${this.height}, round ${this.round}.`);
-      setTimeout(() => this.emit(StakeBlockchain.NEW_ROUND, 0));
-      return;
-    }
-    
     //****FIXME: Need to make a proof-of-lock for both block consensus
     // or for NIL consensus.
 
-    if (winningBlockID === StakeBlockchain.NIL) {
+    if (winningBlockID === undefined) {
+      this.log(`Failed to reach 2/3 majority needed for precommit at height ${this.height}, round ${this.round}.`);
+    } else if (winningBlockID === StakeBlockchain.NIL) {
       // If we receive 2/3 NIL votes, release any locks.
       delete this.lockedBlock;
-      setTimeout(() => this.emit(StakeBlockchain.NEW_ROUND, 0));
-      return;
+    } else {
+      // There is some ambiguity between Tendermint 0.5 and 0.6.  TM 0.5
+      // indicates that a validator locks on to a **proposal**.  TM 0.6 instead
+      // states that a validator locks on to a **block**.  We follow the latter.
+      this.log(`Block ${winningBlockID} has more than 2/3 votes and is the winner`);
+      this.lockedBlock = this.proposedBlocks[winningBlockID];
+    
+      // Broadcasting successful precommit.
+      let vote = Vote.makeVote(this, StakeBlockchain.PRECOMMIT, winningBlockID);
+      this.net.broadcast(StakeBlockchain.PRECOMMIT, vote);
     }
-    
-    // There is some ambiguity between Tendermint 0.5 and 0.6.  TM 0.5
-    // indicates that a validator locks on to a **proposal**.  TM 0.6 instead
-    // states that a validator locks on to a **block**.  We follow the latter.
-    this.log(`Block ${winningBlockID} has more than 2/3 votes and is the winner`);
-    this.lockedBlock = this.proposedBlocks[winningBlockID];
-    
-    // Broadcasting successful precommit.
-    let vote = Vote.makeVote(this, StakeBlockchain.PRECOMMIT, winningBlockID);
-    this.net.broadcast(StakeBlockchain.PRECOMMIT, vote);
 
-    // Setting timer for commit step.
-    setTimeout(() => this.commit(), this.round*DELTA);
+    // Setting to decide on whether to commit.
+    setTimeout(() => this.commitDecision(), this.round*DELTA);
   }
 
-
+  /**
+   * Validates precommit vote, saving it if it is a valid vote.
+   * This step will also catch any attempts to double-vote.
+   * 
+   * @param {Vote} vote - incoming vote.
+   */
   collectPrecommit(precommit) {
     this.verifyAndVote(precommit, this.precommits);
   }
 
-  commit() {
+  /**
+   * If 2/3 precommits are received, the validator commits.
+   * Otherwise, it begins a new round.
+   */
+  commitDecision() {
     let winningBlockID = this.countVotes(this.precommits);
     this.precommits = {};
 
-    // 1) GET BLOCK (Do without waiting?)
-
-    // 2) ONCE BLOCK IS RECEIVED, BROADCAST COMMIT. (Do without waiting?)
-
-    // 3) ONCE 2/3 COMMITS RECEIVED, move on to newHeight
-
-    // For now, if proposal is signed by the proposer, accept the block
-    // and progress after a 1 second delay.
-    if (this.currentProposer === this.address) {
-      this.log("Announcing block");
-      delete this.lockedBlock;
-      //this.proposedBlocks = {};
-      this.announceProof();
+    if (winningBlockID === undefined || winningBlockID === StakeBlockchain.NIL) {
+      setTimeout(() => this.newRound(), 0);
+    } else {
+      this.commit(winningBlockID);
     }
+  }
 
-    // If the validator does not have the block, it needs to get it from another validator.
+  /**
+   * The Tendermint papers differ on how the commit stage works.
+   * As soon as the validator receives 2/3 precommits:
+   * 
+   * 1) Get the block if the validator does not already have it.
+   * 
+   * 2) Once the validator has the block, broadcast a commit.
+   */
+  commit(winningBlockID) {
+    // **FIXME** Handle case where block is not available.
 
-    // Next, it signs and broadcasts its commit to the block.
+    this.nextBlock = StakeBlockchain.deserializeBlock(this.proposedBlocks[winningBlockID]);
 
-    // Once 2/3 commits are received, validator sets its commitTime
-    // and transitions to newHight.
+    let vote = Vote.makeVote(this, StakeBlockchain.COMMIT, winningBlockID);
+    this.net.broadcast(StakeBlockchain.COMMIT, vote);
+
+    setTimeout(() => this.finalizeCommit(), DELTA);
+  }
+
+  /**
+   * Validates commit vote, saving it if it is a valid vote.
+   * This step will also catch any attempts to double-vote.
+   * 
+   * @param {Vote} vote - incoming vote.
+   */
+  collectCommit(commit) {
+    this.verifyAndVote(commit, this.commits);
+  }
+
+  finalizeCommit() {
+    let winningBlockID = this.countVotes(this.commits);
+
+    if (winningBlockID === undefined) {
+      // If we have less than 2/3 commits, wait longer.
+      this.log(`No consensus on ${this.nextBlock.id} yet.  Waiting...`);
+      setTimeout(() => this.finalizeCommit(), DELTA);
+    } else {
+      // **FIXME** ONCE 2/3 COMMITS RECEIVED, move on to newHeight (CHange timeout value)
+      setTimeout(() => this.newHeight(), DELTA);
+
+    }
   }
 
   newHeight() {
-    // Gather additional commits before starting new round.
+    // **FIXME** Gather up signatures.
+
+    // Announce new block.
+    //this.currentBlock = this.nextBlock;
+    //this.announceProof();
+    if (this.address === this.currentProposer) {
+      this.announceProof();
+    }
+
+    // Reset details
+    this.commits = {};
+    delete this.nextBlock;
+    delete this.lockedBlock;
+    this.round = 0;
+
+    // Start working on the next block.
+    //this.receiveBlock(this.currentBlock);
+    setTimeout(() => {
+      this.startNewSearch();
+      this.newRound();
+    }, 0);
   }
 
+  //*
   receiveBlock(...args) {
     this.log("Receiving block");
     super.receiveBlock(...args);
-    this.log("Starting new round");
-    this.startNewSearch();
+    //this.log("Starting new round");
 
-    this.emit(StakeBlockchain.NEW_ROUND);
+    //setTimeout(() => this.newRound(), 0);
   }
+  //*/
 
 };

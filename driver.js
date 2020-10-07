@@ -81,8 +81,8 @@ setTimeout(() => {
   console.log();
   console.log(`Mickey has a chain of length ${mickey.currentBlock.chainLength}:`);
 
-  console.log();
-  console.log(`Donald has a chain of length ${donald.currentBlock.chainLength}:`);
+  //console.log();
+  //console.log(`Donald has a chain of length ${donald.currentBlock.chainLength}:`);
 
   console.log();
   console.log("Final balances (Minnie's perspective):");
@@ -97,4 +97,4 @@ setTimeout(() => {
   showBalances(donald);
 
   process.exit(0);
-}, 5000);
+}, 10000);

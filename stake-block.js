@@ -131,6 +131,7 @@ module.exports = class StakeBlock extends Block {
    * @returns {Boolean} - True if the block's transactions are all valid.
    */
   rerun(prevBlock) {
+    console.log("RERUNNING BLOCK");
     this.stakeBalances = new Map(prevBlock.stakeBalances);
     this.unstakingEvents = new Map(prevBlock.unstakingEvents);
     this.accumPower = new Map(prevBlock.accumPower);

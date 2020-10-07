@@ -1,0 +1,8 @@
+1) Need to share rewards among all participants
+
+2) Need to handle multiple rounds
+
+3) Need to do proof-of-lock
+
+4) Need to write evidence transactions
+
