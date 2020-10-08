@@ -27,6 +27,9 @@ module.exports = class Validator extends Miner {
    * Starts listeners and begins block production.
    */
   initialize() {
+    // Storing transactions for next block.
+    this.transactions = new Set();
+
     this.startNewSearch();
 
     this.on(StakeBlockchain.POST_TRANSACTION, this.addTransaction);
@@ -55,8 +58,8 @@ module.exports = class Validator extends Miner {
    * In addition to other responsibilities related to searching for a new block,
    * the accumulated power must be copied over for the round.
    */
-  startNewSearch(...args) {
-    super.startNewSearch(...args);
+  startNewSearch() {
+    super.startNewSearch();
     this.roundAccumPower = new Map(this.currentBlock.accumPower);
 
     // Tracking height/round for the proposal.
@@ -186,6 +189,12 @@ module.exports = class Validator extends Miner {
     // *"proof-of-lock" if locked onto a block from a previous round
     this.currentBlock = StakeBlockchain.makeBlock(this.address, this.lastBlock);
 
+    // Add queued-up transactions to block.
+    this.transactions.forEach((tx) => {
+      this.currentBlock.addTransaction(tx, this);
+    });
+    this.transactions.clear();
+
     this.log(`Proposing block ${this.currentBlock.id} for round ${this.currentBlock.chainLength}-${this.round}.`);
 
     // FIXME: This should be only once per block height,
@@ -218,7 +227,17 @@ module.exports = class Validator extends Miner {
    */
   collectProposal(proposal) {
     this.proposals.push(new Proposal(proposal));
-    this.proposedBlocks[proposal.blockID] = proposal.block;
+    let block = StakeBlockchain.deserializeBlock(proposal.block);
+
+    // If we don't have the previous block, we don't accept the block.
+    // Fetching the missing blocks will be triggered if the block is
+    // actually accepted.
+    let prevBlock = this.blocks.get(block.prevBlockHash);
+    if (prevBlock === undefined) return;
+
+    // Otherwise, we rerun the block to update balances/etc. and store it.
+    block.rerun(prevBlock);
+    this.proposedBlocks[proposal.blockID] = block;
   }
 
   /**
@@ -363,7 +382,7 @@ module.exports = class Validator extends Miner {
   commit(winningBlockID) {
     // **FIXME** Handle case where block is not available.
 
-    this.nextBlock = StakeBlockchain.deserializeBlock(this.proposedBlocks[winningBlockID]);
+    this.nextBlock = this.proposedBlocks[winningBlockID];
 
     let vote = Vote.makeVote(this, StakeBlockchain.COMMIT, winningBlockID);
     this.net.broadcast(StakeBlockchain.COMMIT, vote);
@@ -399,11 +418,11 @@ module.exports = class Validator extends Miner {
     // **FIXME** Gather up signatures.
 
     // Announce new block.
-    //this.currentBlock = this.nextBlock;
-    //this.announceProof();
-    if (this.address === this.currentProposer) {
-      this.announceProof();
-    }
+    this.currentBlock = this.nextBlock;
+    this.announceProof();
+    //if (this.address === this.currentProposer) {
+    //  this.announceProof();
+    //}
 
     // Reset details
     this.commits = {};
@@ -428,5 +447,12 @@ module.exports = class Validator extends Miner {
     //setTimeout(() => this.newRound(), 0);
   }
   //*/
+
+  addTransaction(tx) {
+    this.log(`Storing transaction ${tx.id} for next block`);
+    //return super.addTransaction(tx)
+    tx = StakeBlockchain.makeTransaction(tx);
+    this.transactions.add(tx);
+  }
 
 };
