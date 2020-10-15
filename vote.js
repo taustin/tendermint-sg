@@ -124,7 +124,20 @@ module.exports = class Vote {
     }
 
     // Same height if we made it here
-    return this.round > otherVote.round;
+    if (this.round > otherVote.round) {
+      return true;
+    } else if (this.round < otherVote.round) {
+      return false;
+    }
+
+    // COMMIT > PRECOMMIT > PREVOTE
+    if (this.type === StakeBlockchain.COMMIT) {
+      return otherVote.type !== StakeBlockchain.COMMIT;
+    } else if (this.type === StakeBlockchain.PRECOMMIT) {
+      return otherVote.type === StakeBlockchain.PREVOTE;
+    } else {
+      return false;
+    }
   }
 
 };

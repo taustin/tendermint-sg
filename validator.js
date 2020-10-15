@@ -98,8 +98,10 @@ module.exports = class Validator extends Miner {
         return;
       }
 
-      // If vote is a duplicate, just ignore it.
-      if (currentVote.id !== vote.id) {
+      if (currentVote.id === vote.id) {
+        // If vote is a duplicate, just ignore it.
+        return;
+      } else {
         throw new Error(`
           Possible Byzantine behavior by ${vote.from}.
           Received conflicting votes:
@@ -132,11 +134,6 @@ module.exports = class Validator extends Miner {
     Object.keys(ballotBox).forEach((voterAddr) => {
       let stake = this.currentBlock.amountGoldStaked(voterAddr);
       let vote = ballotBox[voterAddr];
-
-      if (vote === undefined) {
-        debugger;
-      }
-
       let blockID = vote.blockID;
       let currentVotes = candidateBlocks[blockID] || 0;
       currentVotes += stake;

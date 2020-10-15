@@ -2,11 +2,11 @@
 
 // Network simulation settings
 const CHANCE_DROPPED_MSG = 0;
-const MESSAGE_DELAY_RANGE = 0;
+const MESSAGE_DELAY_RANGE = 1000;
 
 // Tendermint settings for delays.
 const DELTA = 400;
-const COMMIT_TIME = 1000;
+const COMMIT_TIME = 2000;
 
 const { Client, Transaction } = require('spartan-gold');
 
