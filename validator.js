@@ -134,6 +134,12 @@ module.exports = class Validator extends Miner {
     Object.keys(ballotBox).forEach((voterAddr) => {
       let stake = this.currentBlock.amountGoldStaked(voterAddr);
       let vote = ballotBox[voterAddr];
+
+      // Ignore stale votes (unless they are commits)
+      if (vote.isStale(this.height, this.round)) {
+        return;
+      }
+
       let blockID = vote.blockID;
       let currentVotes = candidateBlocks[blockID] || 0;
       currentVotes += stake;

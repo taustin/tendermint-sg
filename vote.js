@@ -140,4 +140,14 @@ module.exports = class Vote {
     }
   }
 
+  isStale(height, round) {
+    if (this.height < height) {
+      return true;
+    }
+    if (this.round < round) {
+      return this.type !== StakeBlockchain.COMMIT;
+    }
+    return false;
+  }
+
 };
