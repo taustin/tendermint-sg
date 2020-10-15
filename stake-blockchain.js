@@ -8,6 +8,10 @@ const PRECOMMIT = "PRECOMMIT";
 const COMMIT = "COMMIT";
 const NIL = "NIL";
 
+// Default delay settings
+const DELTA = 300;
+const COMMIT_TIME = 1000;
+
 module.exports = class StakeBlockchain extends Blockchain {
   static get BLOCK_PROPOSAL() { return BLOCK_PROPOSAL; }
   static get PREVOTE() { return PREVOTE; }
@@ -15,9 +19,15 @@ module.exports = class StakeBlockchain extends Blockchain {
   static get COMMIT() { return COMMIT; }
   static get NIL() { return NIL; }
 
+  static get DELTA() { return Blockchain.cfg.delta; }
+  static get COMMIT_TIME() { return Blockchain.cfg.commitTime; }
+
   static makeGenesis(cfg) {
     // Generating the default genesis block from the parent
     let genesis = Blockchain.makeGenesis(cfg);
+
+    Blockchain.cfg.delta = cfg.delta || DELTA;
+    Blockchain.cfg.commitTime = cfg.commitTime || COMMIT_TIME;
 
     // Either startingStake or startingStakeMap must be specified, but not both.
     if (cfg.startingStake === undefined && cfg.startingStakeMap === undefined) {

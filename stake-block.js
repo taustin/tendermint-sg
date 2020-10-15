@@ -76,26 +76,6 @@ module.exports = class StakeBlock extends Block {
         throw new Error(`Unrecognized type: ${tx.data.type}`);
     }
 
-    /*
-    // Updating amount of staked gold, if there was any staking.
-    if (tx.amountGoldLocked > 0) {
-      let goldLocked = this.lockedGold(tx.from);
-      this.stakeBalances.set(tx.from, goldLocked + tx.amountGoldLocked);
-
-      // tracking when to unlock gold
-      let unlockingRound = this.chainLength + LOCK_DURATION_ROUNDS;
-      let q = this.unstakingEvents.get(unlockingRound) || [];
-      q.push({clientID: tx.from, amount: tx.amountGoldLocked});
-      this.unstakingEvents.set(unlockingRound, q);
-
-      // Giving generated reward to outputs.
-      if (tx.data.lockingOutputs) tx.data.lockingOutputs.forEach(({amount, address}) => {
-        let receiverBalance = this.balances.get(address) || 0;
-        let minted = LockingTransaction.goldGenerated(amount);
-        this.balances.set(address, receiverBalance + minted);
-      });
-    }*/
-
     // Transaction added successfully.
     return true;
   }

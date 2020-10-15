@@ -76,13 +76,13 @@ module.exports = class Proposal{
    */
   isValid(validator) {
     if (this.from !== validator.currentProposer) {
-      validator.log(`Expecting proposal from ${validator.currentProposer}, but received one from ${this.address}.`);
+      //validator.log(`Expecting proposal from ${validator.currentProposer}, but received one from ${this.address}.`);
       return false;
     } else if (validator.round !== this.round) {
-      validator.log(`Out of round: proposal ${this.id} is for round ${this.round}, but should be for ${validator.round}`);
+      //validator.log(`Out of round: proposal ${this.id} is for round ${this.round}, but should be for ${validator.round}`);
       return false;
     } else if (validator.height !== this.height) {
-      validator.log(`Out of height: proposal ${this.id} is for height ${this.height}, but should be for ${validator.height}`);
+      //validator.log(`Out of height: proposal ${this.id} is for height ${this.height}, but should be for ${validator.height}`);
       return false;
     } else if (!this.hasValidSignature()) {
       validator.log(`Invalid signature for proposal ${this.id}.`);
