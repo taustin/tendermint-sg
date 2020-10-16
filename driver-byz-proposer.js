@@ -2,7 +2,7 @@
 
 // Network simulation settings
 const CHANCE_DROPPED_MSG = 0;
-const MESSAGE_DELAY_RANGE = 1000;
+const MESSAGE_DELAY_RANGE = 0;
 
 // Tendermint settings for delays.
 const DELTA = 400;
@@ -17,6 +17,7 @@ const Blockchain = require('./stake-blockchain.js');
 
 // Simulates problematic network conditions.
 const UnreliableNet = require('./unreliable-net.js');
+const ByzantineProposer = require('./byzantine-proposer.js');
 
 console.log("Starting simulation.  This may take a moment...");
 
@@ -27,13 +28,14 @@ let alice = new Client({name: "Alice", net: fakeNet});
 let bob = new Client({name: "Bob", net: fakeNet});
 let charlie = new Client({name: "Charlie", net: fakeNet});
 
-// Miners
+// Validators
 let minnie = new Validator({name: "Minnie", net: fakeNet});
 let mickey = new Validator({name: "Mickey", net: fakeNet});
 let goofy = new Validator({name: "Goofy", net: fakeNet});
-
-// Late validator - Donald.
 let donald = new Validator({name: "Donald", net: fakeNet});
+
+// Byzantine validators
+let maleficent = new ByzantineProposer({name: "Maleficent", net: fakeNet});
 
 // Creating genesis block
 Blockchain.makeGenesis({
@@ -50,11 +52,13 @@ Blockchain.makeGenesis({
     [mickey, 300],
     [goofy,  200],
     [donald,  500],
+    [maleficent,  500],
   ]),
   startingStakeMap: new Map([
     [minnie, 200],
     [mickey,  99],
     [goofy,   54],
+    [maleficent,   80],
   ]),
 });
 
@@ -66,18 +70,20 @@ function showBalances(client) {
   console.log(`Mickey has ${client.lastBlock.balanceOf(mickey.address)} gold.`);
   console.log(`Goofy has ${client.lastBlock.balanceOf(goofy.address)} gold.`);
   console.log(`Donald has ${client.lastBlock.balanceOf(donald.address)} gold.`);
+  console.log(`Maleficent has ${client.lastBlock.balanceOf(maleficent.address)} gold.`);
 }
 
 // Showing the initial balances from Alice's perspective, for no particular reason.
 console.log("Initial balances:");
 showBalances(alice);
 
-fakeNet.register(alice, bob, charlie, minnie, mickey, goofy);
+fakeNet.register(alice, bob, charlie, minnie, mickey, goofy, donald, maleficent);
 
 // Miners start mining.
 minnie.initialize();
 mickey.initialize();
 goofy.initialize();
+maleficent.initialize();
 
 // Alice transfers some money to Bob.
 console.log(`Alice is transferring 40 gold to ${bob.address}`);

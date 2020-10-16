@@ -3,6 +3,7 @@
 const { Miner } = require('spartan-gold');
 
 const Proposal = require('./proposal.js');
+const StakeBlock = require('./stake-block.js');
 const StakeBlockchain = require('./stake-blockchain.js');
 const StakeMixin = require('./stake-mixin.js');
 const Vote = require('./vote.js');
@@ -102,11 +103,7 @@ module.exports = class Validator extends Miner {
         // If vote is a duplicate, just ignore it.
         return;
       } else {
-        throw new Error(`
-          Possible Byzantine behavior by ${vote.from}.
-          Received conflicting votes:
-          -> ${JSON.stringify(currentVote)}
-          -> ${JSON.stringify(vote)}`);
+        this.postEvidenceTransaction(vote.from, currentVote, vote);
       }
     }
 
@@ -322,12 +319,11 @@ module.exports = class Validator extends Miner {
           // We should not receive 2 valid proposals in a round,
           // unless they are duplicates or the proposer is Byzantine.
           if (bestProposal !== undefined) {
-            if (bestProposal.blockID !== proposal.blockID) {
-              throw new Error(`
-                Possible Byzantine behavior by ${proposal.from}.
-                Received conflicting blocks:
-                -> ${bestProposal.blockID}
-                -> ${proposal.blockID}`);
+            if (bestProposal.blockID === proposal.blockID) {
+              // Ignore duplicates
+              return;
+            } else {
+              this.postEvidenceTransaction(proposal.from, bestProposal, proposal);
             }
           } else {
             bestProposal = proposal;
@@ -455,7 +451,6 @@ module.exports = class Validator extends Miner {
    * @param {Vote} vote - incoming vote.
    */
   collectCommit(commit) {
-    this.log(`Receiving a commit from ${commit.from} for ${commit.height}-${commit.round} `);
     this.verifyAndVote(commit, this.commits);
   }
 
@@ -498,6 +493,44 @@ module.exports = class Validator extends Miner {
   addTransaction(tx) {
     tx = StakeBlockchain.makeTransaction(tx);
     this.transactions.add(tx);
+  }
+
+  postEvidenceTransaction(faultyAddr, oldMessage, newMessage) {
+    // Broadcasting the new transaction.
+    let tx = StakeBlockchain.makeTransaction({
+      from: this.address,
+      nonce: this.nonce,
+      pubKey: this.keyPair.public,
+      outputs: [],
+      fee: 0,
+      data: {
+        type: StakeBlock.TX_TYPE_EVIDENCE,
+        byzantinePlayer: faultyAddr,
+        msg1: oldMessage,
+        msg2: newMessage,
+      },
+    });
+
+    tx.sign(this.keyPair.private);
+
+    // Adding transaction to pending.
+    this.pendingOutgoingTransactions.set(tx.id, tx);
+
+    this.nonce++;
+
+    this.log(`Posting evidence transaction ${tx.id} against ${faultyAddr}`);
+
+    this.net.broadcast(StakeBlockchain.POST_TRANSACTION, tx);
+
+    this.addTransaction(tx, this);
+
+    return tx;
+
+    //throw new Error(`
+    //  Possible Byzantine behavior by ${faultyAddr}.
+    //  Received conflicting messages:
+    //  -> ${JSON.stringify(oldMessage)}
+    //  -> ${JSON.stringify(newMessage)}`);
   }
 
 };

@@ -2,6 +2,9 @@
 
 const { Block } = require('spartan-gold');
 
+const Proposal = require('./proposal.js');
+const Vote = require('./vote.js');
+
 const TX_TYPE_STAKE = "STAKE";
 const TX_TYPE_UNSTAKE = "UNSTAKE";
 const TX_TYPE_EVIDENCE = "EVIDENCE";
@@ -25,6 +28,9 @@ module.exports = class StakeBlock extends Block {
 
     // Tracking power of validators (that is, priority for proposing blocks).
     this.accumPower = (prevBlock && prevBlock.accumPower) ? new Map(prevBlock.accumPower) : new Map();
+
+    // Tracking punishments (so that we don't over punish for a mistake).
+    //this.punishments = (prevBlock && prevBlock.punishments) ? new Set(prevBlock.punishments) : new Set();
 
     this.handleUnstakingEvents();
   }
@@ -71,7 +77,8 @@ module.exports = class StakeBlock extends Block {
         this.unstakeGold(tx.from, tx.data.amountToUnstake);
         break;
       case TX_TYPE_EVIDENCE:
-        throw "Not implemented";
+        this.punishCheater(tx.data.msg1, tx.data.msg2, client);
+        break;
       default:
         throw new Error(`Unrecognized type: ${tx.data.type}`);
     }
@@ -98,6 +105,64 @@ module.exports = class StakeBlock extends Block {
       this.unstakingEvents.set(unstakingRound, q);
   }
 
+  punishCheater(msg1, msg2, client) {
+
+    // Proposals have a 'block' field, so distinguish between
+    // votes and proposals by checking for its existence.
+    if (msg1.block !== undefined) {
+      msg1 = new Proposal(msg1);
+      msg2 = new Proposal(msg2);
+    } else {
+      msg1 = new Vote(msg1);
+      msg2 = new Vote(msg2);
+    }
+
+    //let punishmentID1 = msg1.id + '-' + msg2.id;
+    //let punishmentID2 = msg2.id + '-' + msg1.id;
+    //if (this.punishments.has(punishmentID1)) {
+    //  // If the cheater has already been punished, don't punish them again.
+    //  return;
+    //} else {
+    //  // Otherwise, record the punishment.
+    //  this.punishments.add(punishmentID1);
+    //  this.punishments.add(punishmentID2);
+    //}
+
+    // If the proposals are not duplicates, are from the same
+    // validator, are for the same height and round, and have
+    // valid signatures, they are evidence of Byzantine behavior.
+    if (msg1.id !== msg2.id && msg1.from === msg2.from &&
+        msg1.height === msg2.height && msg1.round === msg2.round &&
+        msg1.hasValidSignature() && msg2.hasValidSignature()) {
+
+      // Byzantine behavior results in the validator losing their stake,
+      // which is redistributed amongst the other validators.
+      // This seems to differ between v. 0.5 where all of the stake is
+      // seized, and 0.6 where only 1/3 of the stake is seized.  We chose
+      // to follow v. 0.5 for the sake of simplicity.
+      let cheaterAddr = msg1.from;
+      let balance = this.balanceOf(msg1.from);
+      let stakeAmount = this.amountGoldStaked(cheaterAddr);
+
+      // Ejecting the cheater from the validator set, and seizing their coins.
+      this.accumPower.delete(cheaterAddr);
+      this.stakeBalances.delete(cheaterAddr);
+      this.unstakingEvents.delete(cheaterAddr);
+      this.balances.set(cheaterAddr, balance - stakeAmount);
+
+      // Dividing up rewards among other validators according to their stake.
+      let totalBonded = this.getTotalStake();
+      this.stakeBalances.forEach((amountStaked, addr) => {
+        let b = this.balanceOf(addr);
+        let proportion = amountStaked / totalBonded;
+        let share = Math.floor(stakeAmount * proportion);
+        this.balances.set(addr, b+share);
+      });
+
+      if (client) client.log(`Seizing ${stakeAmount} bonded coins from ${cheaterAddr}.`);
+    }
+  }
+
   amountGoldStaked(addr) {
     return this.stakeBalances.get(addr) || 0;
   }
@@ -114,6 +179,7 @@ module.exports = class StakeBlock extends Block {
     this.stakeBalances = new Map(prevBlock.stakeBalances);
     this.unstakingEvents = new Map(prevBlock.unstakingEvents);
     this.accumPower = new Map(prevBlock.accumPower);
+    //this.punishments = new Set(prevBlock.punishments);
 
     // Updating the accumulated power for the block.
     this.updateAccumPower(this.rewardAddr);
